@@ -54,7 +54,7 @@ const sendEmailVErificationMail = async ( userEmail: string, userName: string, t
     {
         if ( error instanceof Error )
         {
-            throw Error( error.message )
+            throw new Error( error.message )
         } else
             console.log( error );
     }
@@ -114,7 +114,7 @@ const sendForgotPasswordMail = async ( userEmail: string, userName: string, toke
     {
         if ( error instanceof Error )
         {
-            throw Error( error.message )
+            throw new Error( error.message )
         } else
             console.log( error );
     }
