@@ -122,7 +122,6 @@ userSchema.methods.generateAccessToken = function (): string
         firstName: this.firstName,
         lastName: this.lastName
     }
-    const secret: Secret = process.env.JWT_TOKEN_SECRET as Secret
     return jwt.sign(
         payload,
         jwtConfig.secret,
@@ -156,7 +155,6 @@ userSchema.methods.generateRefreshToken = function (): string
         firstName: this.firstName,
         lastName: this.lastName
     }
-    const secret: Secret = process.env.REFRESH_TOKEN_SECRET as Secret
     return jwt.sign(
         payload,
         rftConfig.secret,

@@ -7,6 +7,11 @@ enum User_LoginType
     EMAIL_PASSWORD = "email"
 }
 
+enum TransactionType
+{
+    INCOME = "income",
+    EXPENSE = "expense"
+}
 
 
-export { User_LoginType, dbName }
+export { User_LoginType, TransactionType, dbName }
