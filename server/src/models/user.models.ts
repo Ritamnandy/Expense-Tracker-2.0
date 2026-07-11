@@ -3,7 +3,7 @@ import mongoose, {  Schema, Model, Types, type HydratedDocument } from "mongoose
 import bcrypt from "bcrypt"
 import jwt, { type SignOptions, type Secret } from "jsonwebtoken"
 import { User_LoginType } from "../constants.js"
-export interface IUser
+interface IUser
 {
     firstName: string
     lastName: string
@@ -16,7 +16,7 @@ export interface IUser
     googleId?: string,
 }
 
-export interface IUserMethods
+interface IUserMethods
 {
     generateAccessToken: () => string
     generateRefreshToken: () => string
@@ -24,10 +24,10 @@ export interface IUserMethods
 }
 
 export type UserDocument = HydratedDocument<IUser, IUserMethods>
-export type UserModel = Model<UserDocument, {}, IUserMethods>
+type UserModel = Model<IUser, {}, IUserMethods>
 
 
-const userSchema = new Schema<UserDocument, UserModel, IUserMethods>(
+const userSchema = new Schema<IUser, UserModel, IUserMethods>(
     {
         firstName: {
             type: String,
@@ -164,4 +164,4 @@ userSchema.methods.generateRefreshToken = function (): string
     )
 }
 
-export const User = mongoose.model<UserDocument, UserModel>( "User", userSchema )
+export const User = mongoose.model<IUser, UserModel>( "User", userSchema )
