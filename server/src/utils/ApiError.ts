@@ -2,11 +2,11 @@
 
 class ApiError extends Error
 {
-    private statusCode: number
+    statusCode: number
     message: string
-    private errors: ( object | string )[]
+    errors: ( object | string )[]
     private success: boolean
-    private data: null
+    data: null
     stack?: string
     constructor (
         statusCode: number,
