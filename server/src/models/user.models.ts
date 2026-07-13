@@ -1,5 +1,5 @@
 
-import mongoose, {  Schema, Model, Types, type HydratedDocument } from "mongoose"
+import mongoose, { Schema, Model, Types, type HydratedDocument } from "mongoose"
 import bcrypt from "bcrypt"
 import jwt, { type SignOptions, type Secret } from "jsonwebtoken"
 import { User_LoginType } from "../constants.js"
@@ -11,9 +11,9 @@ interface IUser
     password: string
     loginType: User_LoginType
     isVerified: boolean
-    refreshToken?: string,
-    avatar?: string,
-    googleId?: string,
+    refreshToken: string | null,
+    avatar: string | null,
+    googleId: string | null,
 }
 
 interface IUserMethods
