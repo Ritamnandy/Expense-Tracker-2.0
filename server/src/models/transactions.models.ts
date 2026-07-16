@@ -24,7 +24,6 @@ const transactionSchema = new Schema<ITransactions, TransactionsModel>(
             enum: TransactionType,
             required: true,
             lowercase: true,
-            index: true
         },
         amount: {
             type: Number,
@@ -43,7 +42,6 @@ const transactionSchema = new Schema<ITransactions, TransactionsModel>(
         transactionDate: {
             type: Date,
             required: true,
-            index: true
         },
         description: {
             type: String,
@@ -66,5 +64,8 @@ const transactionSchema = new Schema<ITransactions, TransactionsModel>(
     { timestamps: true }
 
 )
+transactionSchema.index( { ownerId: 1, transactionDate: -1 } );
+transactionSchema.index( { ownerId: 1, categoryId: 1 } );
+transactionSchema.index( { ownerId: 1, type: 1, transactionDate: -1 } );
 
 export const Transaction = mongoose.model<ITransactions, TransactionsModel>( "Transaction", transactionSchema )
