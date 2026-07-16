@@ -1,7 +1,7 @@
 
 import type { Request, Response, CookieOptions } from "express";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { User, type UserDocument } from "../models/user.models.js";
+import { User, type UserDocument, type TokenPayload } from "../models/user.models.js";
 import { redis } from "../db/redisconnect.db.js"
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -9,6 +9,8 @@ import crypto from "crypto"
 import { redisQueue } from "../jobs/queue.jobs.js";
 import { logger } from "../utils/logger.js";
 import { type AuthRequest } from "../middlewares/auth.middlewares.js";
+import jwt from "jsonwebtoken"
+import { uploadImage, deleteImage } from "../utils/uploadCloudinary.js";
 interface TokenPair
 {
     accessToken: string | null
@@ -45,14 +47,14 @@ const getTokenPair = async ( user: UserDocument ): Promise<TokenPair> =>
 
 const getCode = (): string =>
 {
-    return crypto.randomBytes( 3 ).toString( "hex" )
+    return crypto.randomInt( 100000, 999999 ).toString()
 }
 
 const AccessTokenOptions: CookieOptions = {
     httpOnly: true,
     secure: true,
     sameSite: "none",
-    maxAge: 6 * 60 * 60 * 1000,
+    maxAge: 6 * 60 * 60 * 1000, //6 hours
 }
 const RefreshTokenOptions: CookieOptions = {
     httpOnly: true,
@@ -194,7 +196,7 @@ const reSendVerificationCode = asyncHandler( async ( req: Request, res: Response
     const { email } = req.body as ResendCodeBody
 
     const onCooldown = await redis.get( resendCooldownKey( email ) )
-    
+
     if ( onCooldown )
     {
         logger.warn( "Resend OTP requested during cooldown", { email } );
@@ -304,3 +306,95 @@ const logOutUser = asyncHandler( async ( req: AuthRequest, res: Response ) =>
     logger.info( "User logged out", { userId: user._id } );
     return res.status( 200 ).json( new ApiResponse( 200, "User logged out successfully", [ "User logged out successfully" ] ) )
 } )
+
+const refreshAccessToken = asyncHandler( async ( req: Request, res: Response ) =>
+{
+    const token = req.cookies.refreshToken || req.body.refreshToken as string
+    if ( !token )
+    {
+        logger.warn( "Refresh token not found" );
+        return res.status( 401 ).json( new ApiError( 401, "Unauthorized request", [ "Unauthorized request please login or signup" ] ) )
+    }
+    try
+    {
+        const decodedToken: TokenPayload = jwt.verify( token, process.env.REFRESH_TOKEN_SECRET as string ) as TokenPayload
+        const user: UserDocument | null = await User.findById( decodedToken?.id )
+
+        if ( !user )
+        {
+            logger.warn( "Refresh token not found" );
+            return res.status( 401 ).json( new ApiError( 401, "Unauthorized request", [ "Unauthorized request please login or signup" ] ) )
+        }
+        const { accessToken, refreshToken } = await getTokenPair( user )
+        if ( !accessToken || !refreshToken )
+        {
+            logger.error( "Failed to issue token pair after user login", { userId: user._id } );
+            return res.status( 400 ).json( new ApiError( 400, "Error logging in", [ "Error logging in" ] ) )
+        }
+        res.cookie( "AccessToken", accessToken, AccessTokenOptions )
+        res.cookie( "RefreshToken", refreshToken, RefreshTokenOptions )
+
+        logger.info( "AccessToken refreshed", { userId: user._id } );
+
+        return res.status( 200 ).json( new ApiResponse( 200, "raccessToken refreshed successfully", [ "raccessToken refreshed successfully", {
+            accessToken: accessToken,
+            refreshToken: refreshToken
+        } ] ) )
+
+
+    } catch ( error )
+    {
+        logger.error( "Error refreshing access token", { error: ( error as Error ).message } );
+        return res.status( 400 ).json( new ApiError( 400, "refresh token not found", [ "refresh token not found" ] ) )
+    }
+} )
+
+
+
+const setAavatar = asyncHandler( async ( req: AuthRequest, res: Response ) =>
+{
+    const user: UserDocument | undefined = req.user
+    const file: Express.Multer.File | undefined = req.file
+    const imagePath: string | undefined = file?.path
+    if ( !user )
+    {
+        logger.warn( "Logout attempt with Unauthorized user" );
+        return res.status( 401 ).json( new ApiError( 401, "Unauthorized request", [ "Unauthorized request please login or signup" ] ) )
+    }
+    if ( !imagePath )
+    {
+        logger.warn( "Set avatar attempt with no file uploaded", { userId: user._id } );
+        return res.status( 400 ).json( new ApiError( 400, "Avatar image is required", [ "Please upload an image file" ] ) );
+    }
+    const avatarUrl = await uploadImage( imagePath )
+    if ( !avatarUrl )
+    {
+        logger.error( "Error uploading avatar", { userId: user._id } );
+        return res.status( 500 ).json( new ApiError( 500, "Error uploading avatar", [ "Error uploading avatar" ] ) );
+    }
+    const oldImage = user.avatar
+
+    user.avatar = avatarUrl.url
+    await user.save( { validateBeforeSave: false } )
+
+    await deleteImage( oldImage )
+
+    logger.info( "Avatar set successfully", { userId: user._id } );
+
+    return res.status( 200 ).json( new ApiResponse( 200, "Avatar set successfully", { avatarUrl: avatarUrl } ) )
+
+} )
+
+// const forgetPassword
+
+
+export
+{
+    registerUser,
+    loginUser,
+    logOutUser,
+    refreshAccessToken,
+    reSendVerificationCode,
+    verifyEmail,
+    setAavatar
+}

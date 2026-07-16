@@ -97,8 +97,8 @@ export interface TokenPayload
     id: Types.ObjectId
     email: string
     loginType: User_LoginType
-    firstName: string
-    lastName: string
+    firstName?: string
+    lastName?: string
 }
 const JWT_SECRET = process.env.JWT_TOKEN_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_TOKEN_EXPIRES_IN;
@@ -152,8 +152,6 @@ userSchema.methods.generateRefreshToken = function (): string
         id: this._id,
         email: this.email,
         loginType: this.loginType,
-        firstName: this.firstName,
-        lastName: this.lastName
     }
     return jwt.sign(
         payload,

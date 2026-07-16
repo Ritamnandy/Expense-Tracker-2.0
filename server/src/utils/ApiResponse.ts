@@ -4,9 +4,9 @@ class ApiResponse
     private statusCode: number;
     private success: boolean;
     private message: string;
-    private data: ( string | object )[];
+    private data: ( string | object )[] | object;
     private errer: null
-    constructor ( statusCode: number, message: string, data: ( string | object )[] )
+    constructor ( statusCode: number, message: string, data: ( string | object )[] | object )
     {
         this.statusCode = statusCode;
         this.success = statusCode < 400;

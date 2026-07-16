@@ -4,6 +4,7 @@ import { ApiError } from "../utils/ApiError.js";
 import jwt from "jsonwebtoken"
 import type { Request, Response, NextFunction } from "express";
 import { type UserDocument, type TokenPayload, User } from "../models/user.models.js"
+import { logger } from "../utils/logger.js";
 export interface AuthRequest extends Request
 {
     user?: UserDocument;
@@ -26,13 +27,24 @@ export const verifyJWT = asyncHandler( async ( req: AuthRequest, res: Response, 
             return res.status( 401 ).json( new ApiError( 401, "Unauthorized request", [ "Unauthorized request please login or signup" ] ) )
         }
 
-        req.user = user as UserDocument
-
+        req.user = user
+        
         next()
 
     } catch ( error )
     {
-        console.error( `Error verifying JWT: ${ ( error as Error ).message }` )
+        if ( error instanceof jwt.TokenExpiredError )
+        {
+            logger.warn( "Access token expired", { message: error.message } );
+
+        } else if ( error instanceof jwt.JsonWebTokenError )
+        {
+            logger.warn( "Invalid or tampered access token", { message: error.message } );
+        } else
+        {
+            logger.error( "Error verifying access token", { message: ( error as Error ).message } )
+
+        }
         return res.status( 401 ).json( new ApiError( 401, "Unauthorized request", [ "Unauthorized request please login or signup" ] ) )
     }
 } )
