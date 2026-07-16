@@ -395,7 +395,7 @@ const setAavatar = asyncHandler( async ( req: AuthRequest, res: Response ) =>
 
     user.avatar = avatarImageUrl
     user.avatarId = cloudinaryResponse.publicId
-    await user.save( { validateBeforeSave: false } )
+    await user.save()
 
     await deleteImage( oldImageId )
 
@@ -503,7 +503,7 @@ const resetPassword = asyncHandler( async ( req: Request, res: Response ) =>
 
     user.password = newPassword
     user.refreshToken = null
-    await user.save( { validateBeforeSave: false } )
+    await user.save()
     await redis.del( resetTokenKey( hashedToken ) )
     await EmailQueue.add(
         "send-password-changed-mail",
