@@ -6,7 +6,7 @@ import { redis } from "../db/redisconnect.db.js"
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import crypto from "crypto"
-import { redisQueue } from "../jobs/queue.jobs.js";
+import { EmailQueue } from "../jobs/queue.jobs.js";
 import { logger } from "../utils/logger.js";
 import { type AuthRequest } from "../middlewares/auth.middlewares.js";
 import jwt from "jsonwebtoken"
@@ -67,7 +67,20 @@ const otpKey = ( email: string ) => `otp:${ email }`
 
 const signUpKey = ( email: string ) => `user:signup:${ email }`
 
-const resendCooldownKey = ( email: string ) => `user:resend:cooldown:${ email }`
+const resendCooldownKey = ( email: string ) => `email:resend:cooldown:${ email }`
+
+// password reset keys
+
+const hashToken = ( token: string ): string =>
+{
+    return crypto.createHash( "sha256" ).update( token ).digest( "hex" )
+}
+
+const resetCooldownKey = ( email: string ) => `password:reset:cooldown:${ email }`
+
+const resetTokenKey = ( hashToken: string ) => `password:reset:${ hashToken }`
+
+
 
 interface registerBody
 {
@@ -104,7 +117,7 @@ const registerUser = asyncHandler( async ( req: Request, res: Response ) =>
         return res.status( 400 ).json( new ApiError( 400, "User already exists", [ "User already exists" ] ) )
     }
     const otpCode = getCode()
-    await redis.set( otpKey( email ), otpCode, "EX", 60 * 10 )
+    await redis.set( otpKey( email ), otpCode, "EX", 60 * 15 )
 
     const data: registerBody = {
         firstName,
@@ -117,7 +130,7 @@ const registerUser = asyncHandler( async ( req: Request, res: Response ) =>
 
     await redis.set( signUpKey( email ), JSON.stringify( data ), "EX", 60 * 30 )
 
-    await redisQueue.add( "send-email-verification-mail",
+    await EmailQueue.add( "send-email-verification-mail",
         {
             email,
             userName,
@@ -215,14 +228,14 @@ const reSendVerificationCode = asyncHandler( async ( req: Request, res: Response
     const { firstName, lastName } = userDetails
 
     const otpCode = getCode()
-    await redis.set( otpKey( email ), otpCode, "EX", 60 * 10 )   // OTP validity: 10 min
+    await redis.set( otpKey( email ), otpCode, "EX", 60 * 15 )   // OTP validity: 10 min
 
     await redis.set( resendCooldownKey( email ), "true", "EX", 60 )  // resend cooldown: 60 sec — independent of otp cooldown
 
     await redis.expire( signUpKey( email ), 30 * 60 )  // keep signup session alive for 30 min
 
     const userName = `${ firstName } ${ lastName }`
-    await redisQueue.add( "send-email-verification-mail",
+    await EmailQueue.add( "send-email-verification-mail",
         {
             email,
             userName,
@@ -358,7 +371,7 @@ const setAavatar = asyncHandler( async ( req: AuthRequest, res: Response ) =>
     const imagePath: string | undefined = file?.path
     if ( !user )
     {
-        logger.warn( "Logout attempt with Unauthorized user" );
+        logger.warn( "upload avatar attempt with Unauthorized user" );
         return res.status( 401 ).json( new ApiError( 401, "Unauthorized request", [ "Unauthorized request please login or signup" ] ) )
     }
     if ( !imagePath )
@@ -366,26 +379,172 @@ const setAavatar = asyncHandler( async ( req: AuthRequest, res: Response ) =>
         logger.warn( "Set avatar attempt with no file uploaded", { userId: user._id } );
         return res.status( 400 ).json( new ApiError( 400, "Avatar image is required", [ "Please upload an image file" ] ) );
     }
-    const avatarUrl = await uploadImage( imagePath )
-    if ( !avatarUrl )
+    const cloudinaryResponse = await uploadImage( imagePath )
+    if ( !cloudinaryResponse )
     {
         logger.error( "Error uploading avatar", { userId: user._id } );
         return res.status( 500 ).json( new ApiError( 500, "Error uploading avatar", [ "Error uploading avatar" ] ) );
     }
-    const oldImage = user.avatar
+    const oldImageId = user.avatarId
+    const avatarImageUrl = cloudinaryResponse.url.replace( 'https:', '' )
+    logger.debug( 'avatar image reference ', avatarImageUrl );
 
-    user.avatar = avatarUrl.url
+    user.avatar = avatarImageUrl
+    user.avatarId = cloudinaryResponse.publicId
     await user.save( { validateBeforeSave: false } )
 
-    await deleteImage( oldImage )
+    await deleteImage( oldImageId )
 
     logger.info( "Avatar set successfully", { userId: user._id } );
 
-    return res.status( 200 ).json( new ApiResponse( 200, "Avatar set successfully", { avatarUrl: avatarUrl } ) )
+    return res.status( 200 ).json( new ApiResponse( 200, "Avatar set successfully", { avatarUrl: avatarImageUrl } ) )
 
 } )
 
-// const forgetPassword
+interface forgotPasswordBody
+{
+    email: string
+}
+
+const forgetPassword = asyncHandler( async ( req: Request, res: Response ) =>
+{
+    const { email } = req.body as forgotPasswordBody
+    const genericResponse = () =>
+        res.status( 200 ).json(
+            new ApiResponse(
+                200,
+                "If an account exists with this email, a password reset link has been sent.",
+                {}
+            )
+        );
+
+    const onCooldown = await redis.get( resetCooldownKey( email ) )
+    if ( onCooldown )
+    {
+        logger.warn( "Password reset attempt on cooldown", { email: email } );
+        return genericResponse()
+    }
+
+    const user: UserDocument | null = await User.findOne( { email: email } );
+    if ( !user )
+    {
+        logger.warn( "Password reset attempt with non-existent email", { email: email } );
+        await redis.set( resetCooldownKey( email ), "1", 'EX', 60 )
+        return genericResponse()
+    }
+
+    if ( !user.isVerified )
+    {
+        logger.warn( "Password reset attempt with unverified email", { email: email } );
+        await redis.set( resetCooldownKey( email ), "1", 'EX', 60 )
+        return genericResponse()
+    }
+
+    const rowToken = crypto.randomBytes( 32 ).toString( "hex" );
+
+    const hashedToken = hashToken( rowToken );
+
+    await redis.set( resetTokenKey( hashedToken ), user._id.toString(), 'EX', 60 * 10 )
+    const resetLink = `${ process.env.FONTEND_RESET_PASSWORD_URL as string }?token=${ rowToken }&email=${ encodeURIComponent( email ) }`
+
+    await EmailQueue.add(
+        "send-forgot-password-mail",
+        {
+            email,
+            userName: `${ user.firstName } ${ user.lastName }`,
+            resetLink,
+        },
+        {
+            removeOnComplete: true,
+            removeOnFail: true,
+            attempts: 3,
+            backoff: { type: "exponential", delay: 1000 },
+        }
+    );
+    logger.info( "Password reset link issued", { userId: user._id } ); // never log rawToken/resetLink
+
+    return genericResponse();
+} )
+
+interface resetPasswordBody extends forgotPasswordBody
+{
+    token: string
+    newPassword: string
+}
+
+
+const resetPassword = asyncHandler( async ( req: Request, res: Response ) =>
+{
+    const { email, token, newPassword } = req.body as resetPasswordBody
+    const hashedToken = hashToken( token )
+
+    const userId: string | null = await redis.get( resetTokenKey( hashedToken ) )
+    if ( !userId )
+    {
+        logger.warn( "Reset-password attempted with invalid or expired token", { email } );
+        return res
+            .status( 400 )
+            .json( new ApiError( 400, "Invalid or expired reset link", [ "This reset link is invalid or has expired, please request a new one" ] ) );
+    }
+
+    const user: UserDocument | null = await User.findById( userId )
+
+    if ( !user || user.email !== email )
+    {
+        logger.warn( "Reset-password attempted with invalid or expired token/user mismatch", { email } );
+        return res
+            .status( 400 )
+            .json( new ApiError( 400, "Invalid or expired reset link", [ "This reset link is invalid or has expired, please request a new one" ] ) );
+    }
+
+    user.password = newPassword
+    user.refreshToken = null
+    await user.save( { validateBeforeSave: false } )
+    await redis.del( resetTokenKey( hashedToken ) )
+    await EmailQueue.add(
+        "send-password-changed-mail",
+        {
+            email: user.email,
+            userName: `${ user.firstName } ${ user.lastName }`,
+        },
+        {
+            removeOnComplete: true,
+            removeOnFail: true,
+            attempts: 3,
+            backoff: { type: "exponential", delay: 1000 },
+        }
+    );
+
+    logger.info( "Password reset successful", { userId: user._id } );
+
+    return res
+        .status( 200 )
+        .json( new ApiResponse( 200, "Password reset successfully , please log in with your new password", {} ) );
+
+} )
+
+const getCurrentUser = asyncHandler( async ( req: AuthRequest, res: Response ) =>
+{
+    const user: UserDocument | undefined = req.user;
+    if ( !user )
+    {
+        logger.warn( "get current user attempt with Unauthorized user" );
+        return res.status( 401 ).json( new ApiError( 401, "Unauthorized request", [ "Unauthorized request please login or signup" ] ) )
+    }
+    const { password, refreshToken, googleId, isVerified, avatarId, ...rest } = user.toObject()
+    return res.status( 200 ).json( new ApiResponse( 200, "Current user", { user: rest } ) )
+} )
+
+
+
+
+
+
+
+
+
+
+
 
 
 export
@@ -396,5 +555,8 @@ export
     refreshAccessToken,
     reSendVerificationCode,
     verifyEmail,
-    setAavatar
+    setAavatar,
+    forgetPassword,
+    resetPassword,
+    getCurrentUser
 }

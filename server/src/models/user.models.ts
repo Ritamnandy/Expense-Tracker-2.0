@@ -13,6 +13,7 @@ interface IUser
     isVerified: boolean
     refreshToken: string | null,
     avatar: string | null,
+    avatarId: string | null,
     googleId: string | null,
 }
 
@@ -77,7 +78,10 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>(
             type: String,
             default: null
         },
-
+        avatarId: {
+            type: String,
+            default: null
+        },
     }, { timestamps: true }
 )
 
