@@ -11,6 +11,9 @@ import { logger } from "../utils/logger.js";
 import { type AuthRequest } from "../middlewares/auth.middlewares.js";
 import jwt from "jsonwebtoken"
 import { uploadImage, deleteImage } from "../utils/uploadCloudinary.js";
+import { seedDefaultCategories } from "../services/categories.services.js";
+import { type CategoryDocument } from "../models/categories.models.js";
+
 interface TokenPair
 {
     accessToken: string | null
@@ -179,6 +182,7 @@ const verifyEmail = asyncHandler( async ( req: Request, res: Response ) =>
         logger.error( "User.create returned falsy value", { email } );
         return res.status( 400 ).json( new ApiError( 400, "Error creating user", [ "Error creating user" ] ) )
     }
+    const defaultsCategory: CategoryDocument[] | null = await seedDefaultCategories( createdUser._id )
     const { accessToken, refreshToken } = await getTokenPair( createdUser )
     if ( !accessToken || !refreshToken )
     {
@@ -190,7 +194,7 @@ const verifyEmail = asyncHandler( async ( req: Request, res: Response ) =>
     await redis.del( otpKey( email ) )
     await redis.del( signUpKey( email ) )
 
-    logger.info( "User registered and verified", { userId: createdUser._id } );
+    logger.info( "User registered and verified", [ { userId: createdUser._id }, { categories: defaultsCategory } ] );
 
     res.cookie( "AccessToken", accessToken, AccessTokenOptions )
     res.cookie( "RefreshToken", refreshToken, RefreshTokenOptions )
