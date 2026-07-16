@@ -1,15 +1,28 @@
 
 import { Worker, type Job } from "bullmq";
 import { connection } from "../db/redisconnect.db.js"
-import { sendEmailVErificationMail, sendForgotPasswordMail } from "../utils/mail.js";
+import { sendEmailVerificationMail, sendForgetPasswordMail, sentPasswordChangedMail } from "../utils/mail.js";
 import { logger } from "../utils/logger.js"
 interface VerificationJobData
 {
     email: string;
     userName: string;
     token: string;
+
 }
 
+interface ForgotPasswordJobData
+{
+    email: string;
+    userName: string;
+    link: string;
+}
+
+interface PasswordChangedJobData
+{
+    email: string
+    userName: string
+}
 
 const worker = new Worker( "TaskQueue", async ( job: Job ) =>
 {
@@ -17,16 +30,21 @@ const worker = new Worker( "TaskQueue", async ( job: Job ) =>
     {
         case "send-email-verification-mail": {
             const { email, userName, token } = job.data as VerificationJobData;
-            await sendEmailVErificationMail( email, userName, token );
+            await sendEmailVerificationMail( email, userName, token );
             break;
         }
         case "send-forgot-password-mail": {
-            const { email, userName, token } = job.data as VerificationJobData;
-            await sendForgotPasswordMail( email, userName, token );
+            const { email, userName, link } = job.data as ForgotPasswordJobData;
+            await sendForgetPasswordMail( email, userName, link );
+            break;
+        }
+        case "send-password-changed-mail": {
+            const { email, userName } = job.data as PasswordChangedJobData;
+            await sentPasswordChangedMail( email, userName );
             break;
         }
         default:
-        logger.warn( `Unknown job name: ${ job.name }` );
+            logger.warn( `Unknown job name: ${ job.name }` );
     }
 
 
