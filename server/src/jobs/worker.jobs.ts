@@ -24,7 +24,7 @@ interface PasswordChangedJobData
     userName: string
 }
 
-const worker = new Worker( "TaskQueue", async ( job: Job ) =>
+const worker = new Worker( "EmailQueue", async ( job: Job ) =>
 {
     switch ( job.name )
     {
