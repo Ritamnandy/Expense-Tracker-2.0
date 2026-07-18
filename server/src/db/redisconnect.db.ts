@@ -6,4 +6,7 @@ export const connection = {
     port: Number( process.env.REDIS_PORT as string ),
 }
 
-export const redis = new Redis( process.env.REDIS_URL as string );
+export const redis = new Redis( {
+    host: connection.host,
+    port: connection.port
+} );

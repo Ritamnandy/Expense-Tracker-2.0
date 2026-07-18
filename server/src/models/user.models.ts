@@ -104,8 +104,8 @@ export interface TokenPayload
     firstName?: string
     lastName?: string
 }
-const JWT_SECRET = process.env.JWT_TOKEN_SECRET;
-const JWT_EXPIRES_IN = process.env.JWT_TOKEN_EXPIRES_IN;
+const JWT_SECRET = process.env.JWT_TOKEN_SECRET as string;
+const JWT_EXPIRES_IN = process.env.JWT_TOKEN_EXPIRES_IN as string;
 
 if ( !JWT_SECRET )
     throw new Error( "JWT_TOKEN_SECRET missing" );
@@ -115,7 +115,7 @@ if ( !JWT_EXPIRES_IN )
 
 export const jwtConfig = {
     secret: JWT_SECRET,
-    expiresIn: JWT_EXPIRES_IN as SignOptions[ "expiresIn" ],
+    expiresIn: JWT_EXPIRES_IN,
 };
 userSchema.methods.generateAccessToken = function (): string
 {
@@ -128,15 +128,15 @@ userSchema.methods.generateAccessToken = function (): string
     }
     return jwt.sign(
         payload,
-        jwtConfig.secret,
+        jwtConfig.secret as Secret,
         {
             expiresIn: jwtConfig.expiresIn
         } as SignOptions
     )
 }
 
-const REFRESH_TOKEN_SECRETS = process.env.REFRESH_TOKEN_SECRET;
-const REFRESH_TOKEN_EXPIRY = process.env.REFRESH_TOKEN_EXPIRES_IN;
+const REFRESH_TOKEN_SECRETS = process.env.REFRESH_TOKEN_SECRET as string;
+const REFRESH_TOKEN_EXPIRY = process.env.REFRESH_TOKEN_EXPIRES_IN as string;
 
 if ( !REFRESH_TOKEN_SECRETS )
     throw new Error( "REFRESH_TOKEN_SECRET missing" );
@@ -146,7 +146,7 @@ if ( !REFRESH_TOKEN_EXPIRY )
 
 export const rftConfig = {
     secret: REFRESH_TOKEN_SECRETS,
-    expiresIn: REFRESH_TOKEN_EXPIRY as SignOptions[ "expiresIn" ],
+    expiresIn: REFRESH_TOKEN_EXPIRY,
 };
 
 
@@ -159,7 +159,7 @@ userSchema.methods.generateRefreshToken = function (): string
     }
     return jwt.sign(
         payload,
-        rftConfig.secret,
+        rftConfig.secret as Secret,
         {
             expiresIn: rftConfig.expiresIn
         } as SignOptions

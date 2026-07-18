@@ -11,6 +11,7 @@ import { notFound } from "./middlewares/notfound.middlewares.js";
 import { ApiError } from "./utils/ApiError.js";
 import { logger } from "./utils/logger.js";
 
+import "./jobs/worker.jobs.js"
 
 const app: Express = express();
 
@@ -28,6 +29,7 @@ app.use( express.urlencoded( { extended: true, limit: "20kb" } ) );
 app.use( cookieParser() );
 app.use( compression() );
 app.use( requestIp.mw() );
+app.use( express.static( "public" ) );
 
 // Pipe morgan's HTTP request logs through winston instead of raw stdout,
 // so request logs land in the same place as everything else.
@@ -60,10 +62,17 @@ const globalLimiter = rateLimit( {
 
 app.use( globalLimiter );
 
+import userRouter from "./routes/user.routes.js";
+import categoryRouter from "./routes/categories.routes.js";
+import transactionRouter from "./routes/transctions.routes.js";
+
+
+
 // Routes — must be registered BEFORE notFound/errorHandler
-// app.use( "/api/v1/users", userRouter );
-// app.use( "/api/v1/categories", categoryRouter );
-// app.use( "/api/v1/transactions", transactionRouter );
+
+app.use( "/api/v1/users", userRouter );
+app.use( "/api/v1/categories", categoryRouter );
+app.use( "/api/v1/transactions", transactionRouter );
 
 // notFound must come after all real routes — catches anything unmatched
 app.use( notFound );
