@@ -36,31 +36,31 @@ const createAuthLimiter = ( { windowMs, max, label }: AuthLimiterOptions ) =>
 };
 
 export const loginLimiter = createAuthLimiter( {
-    windowMs: 15 * 60 * 1000,
+    windowMs: 20 * 60 * 1000,
     max: 5,
     label: "login",
 } );
 
 export const registerLimiter = createAuthLimiter( {
-    windowMs: 15 * 60 * 1000,
+    windowMs: 20 * 60 * 1000,
     max: 5,
     label: "register",
 } );
 
 export const verifyEmailLimiter = createAuthLimiter( {
-    windowMs: 15 * 60 * 1000,  
+    windowMs: 20 * 60 * 1000,
     max: 8,    // 10 times per 15 minutes
     label: "verify-email",
 } );
 
 export const resendCodeLimiter = createAuthLimiter( {
-    windowMs: 15 * 60 * 1000,
+    windowMs: 20 * 60 * 1000,
     max: 5,
     label: "resend-verification-code",
 } );
 
 export const forgotPasswordLimiter = createAuthLimiter( {
-    windowMs: 15 * 60 * 1000,
+    windowMs: 20 * 60 * 1000,
     max: 5,
     label: "forgot-password",
 } );
