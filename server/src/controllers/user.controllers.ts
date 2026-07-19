@@ -451,6 +451,8 @@ const forgetPassword = asyncHandler( async ( req: Request, res: Response ) =>
     await redis.set( resetTokenKey( hashedToken ), user._id.toString(), 'EX', 60 * 10 )
     const resetLink = `${ process.env.FONTEND_RESET_PASSWORD_URL as string }?token=${ rowToken }&email=${ encodeURIComponent( email ) }`
 
+    console.log( "Reset link:- ", resetLink );
+
     await EmailQueue.add(
         "send-forgot-password-mail",
         {

@@ -19,7 +19,7 @@ const mailGenerator = new mailgen( {
     },
 } );
 
-const sendEmailVerificationMail = async ( userEmail: string, userName: string, token: string ) =>
+const sendEmailVerificationMail = async ( userEmail: string, userName: string, token: string,link: string="" ) =>
 {
 
     const email = {
@@ -31,7 +31,7 @@ const sendEmailVerificationMail = async ( userEmail: string, userName: string, t
                 button: {
                     color: "#bc621d",
                     text: token,
-                    link: "#",
+                    link,
                 },
             },
             outro: "This code will expire in 10 minutes.\nNeed help, or have questions? Just reply to this email, we'd love to help.",
@@ -78,7 +78,7 @@ const sendForgetPasswordMail = async ( userEmail: string, userName: string, link
                 button: {
                     color: "#bc621d",
                     text: "Reset Password",
-                    link,
+                    link: link,
                 },
             },
             outro:
@@ -149,3 +149,5 @@ export
     sendForgetPasswordMail,
     sentPasswordChangedMail
 }
+
+

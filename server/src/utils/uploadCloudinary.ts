@@ -30,14 +30,15 @@ const uploadImage = async ( imagePath: string | undefined ): Promise<UploadResul
             .upload( imagePath, {
                 resource_type: "auto",
             } )
-
+            console.log(response);
+            
         const result = response.secure_url
         await fs.unlink( imagePath, ( err ) =>
         {
             // Log but never let cleanup failure mask a successful upload
             logger.warn( "Failed to remove local file after successful upload", {
                 imagePath,
-                error: ( err as Error ).message,
+                error: err ,
             } );
         } )
 
@@ -70,7 +71,9 @@ const deleteImage = async ( imageId: string | undefined | null ) =>
     if ( !imageId ) return
     try
     {
-        const response = await Cloudinary.uploader.destroy( imageId )
+        const response = await Cloudinary.uploader.destroy( imageId, {
+            resource_type: "auto",
+        } )
 
         if ( response.result !== "ok" && response.result !== "not found" )
         {
